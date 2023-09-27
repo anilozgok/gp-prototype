@@ -1,0 +1,6 @@
+{
+  "rabbitMq": {
+    "host": "localhost",
+    "port": 5672
+  }
+}
