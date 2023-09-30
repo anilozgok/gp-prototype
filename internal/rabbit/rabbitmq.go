@@ -8,14 +8,12 @@ import (
 	"go.uber.org/zap"
 )
 
-//TODO: we cannot re-open a channel after it is closed. we need to find a way to declare queue and publish message before channel is closed
-
 type RabbitClient struct {
-	Ch *amqp.Channel
+	Conn *amqp.Connection
+	Ch   *amqp.Channel
 }
 
 func New(cfg *config.Config) (*RabbitClient, error) {
-
 	connStr := fmt.Sprintf("amqp://%s:%s@%s:%d/",
 		cfg.Secrets.RabbitMqCredentials.Username,
 		cfg.Secrets.RabbitMqCredentials.Password,
@@ -25,24 +23,34 @@ func New(cfg *config.Config) (*RabbitClient, error) {
 
 	conn, err := amqp.Dial(connStr)
 	if err != nil {
-		log.Logger().Fatal("failed to connect to rabbitmq", zap.Error(err))
 		return nil, err
 	}
-	defer conn.Close()
-	log.Logger().Info("successfully connected to rabbitMq")
+	log.Logger().Info("successfully created rabbit client")
 
-	ch, err := conn.Channel()
+	return &RabbitClient{Conn: conn}, nil
+}
+
+func (r *RabbitClient) CloseConnection() {
+	r.Conn.Close()
+}
+
+func (r *RabbitClient) OpenChannel() error {
+	ch, err := r.Conn.Channel()
 	if err != nil {
-		log.Logger().Fatal("failed to create channel", zap.Error(err))
-		return nil, err
+		log.Logger().Fatal("failed to open a channel", zap.Error(err))
+		return err
 	}
-	defer ch.Close()
-	log.Logger().Info("successfully created a channel")
-	return &RabbitClient{Ch: ch}, nil
+	r.Ch = ch
+	log.Logger().Info("successfully opened a channel")
+
+	return nil
+}
+
+func (r *RabbitClient) CloseChannel() {
+	r.Ch.Close()
 }
 
 func (r *RabbitClient) DeclareQueue(name string) error {
-
 	q, err := r.Ch.QueueDeclare(
 		name,
 		false,
@@ -52,7 +60,6 @@ func (r *RabbitClient) DeclareQueue(name string) error {
 		nil,
 	)
 	if err != nil {
-		log.Logger().Fatal("failed to declare a queue", zap.Error(err))
 		return err
 	}
 	log.Logger().Info("successfully declared a queue", zap.String("queue", q.Name))
@@ -72,7 +79,6 @@ func (r *RabbitClient) PublishMessage(name string, message string) error {
 		},
 	)
 	if err != nil {
-		log.Logger().Fatal("failed to publish a message", zap.Error(err))
 		return err
 	}
 	log.Logger().Info("successfully published a message", zap.String("queue", name))

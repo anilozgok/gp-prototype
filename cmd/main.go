@@ -8,7 +8,6 @@ import (
 )
 
 func main() {
-
 	cfg, err := config.Get("./configs")
 	if err != nil {
 		log.Logger().Fatal("failed to read configs", zap.Error(err))
@@ -18,14 +17,18 @@ func main() {
 	if err != nil {
 		log.Logger().Fatal("failed to create rabbit client", zap.Error(err))
 	}
+	defer rabbitClient.CloseConnection()
 
-	err = rabbitClient.DeclareQueue("test")
-	if err != nil {
+	if err = rabbitClient.OpenChannel(); err != nil {
+		log.Logger().Fatal("failed to open channel", zap.Error(err))
+	}
+	defer rabbitClient.CloseChannel()
+
+	if err = rabbitClient.DeclareQueue("test"); err != nil {
 		log.Logger().Fatal("failed to declare queue", zap.Error(err))
 	}
 
-	err = rabbitClient.PublishMessage("test", "test message")
-	if err != nil {
+	if err = rabbitClient.PublishMessage("test", "test message"); err != nil {
 		log.Logger().Fatal("failed to publish message", zap.Error(err))
 	}
 
