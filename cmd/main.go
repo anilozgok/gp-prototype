@@ -2,8 +2,10 @@ package main
 
 import (
 	"github.com/anilozgok/gp-prototype/internal/config"
+	"github.com/anilozgok/gp-prototype/internal/handlers"
 	"github.com/anilozgok/gp-prototype/internal/log"
 	"github.com/anilozgok/gp-prototype/internal/rabbit"
+	"github.com/gofiber/fiber/v2"
 	"go.uber.org/zap"
 )
 
@@ -19,17 +21,15 @@ func main() {
 	}
 	defer rabbitClient.CloseConnection()
 
-	if err = rabbitClient.OpenChannel(); err != nil {
-		log.Logger().Fatal("failed to open channel", zap.Error(err))
-	}
-	defer rabbitClient.CloseChannel()
+	handler := handlers.New(rabbitClient)
 
-	if err = rabbitClient.DeclareQueue("test"); err != nil {
-		log.Logger().Fatal("failed to declare queue", zap.Error(err))
-	}
+	app := fiber.New()
+	router := app.Group("/api/v1")
 
-	if err = rabbitClient.PublishMessage("test", "test message"); err != nil {
-		log.Logger().Fatal("failed to publish message", zap.Error(err))
-	}
+	router.Get("/health", handler.HealthCheck)
+	router.Post("/publish", handler.PublishMessage)
 
+	if err = app.Listen(":8080"); err != nil {
+		log.Logger().Fatal("failed to start server", zap.Error(err))
+	}
 }

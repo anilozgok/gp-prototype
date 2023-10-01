@@ -1,9 +1,11 @@
 package rabbit
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/anilozgok/gp-prototype/internal/config"
 	"github.com/anilozgok/gp-prototype/internal/log"
+	"github.com/anilozgok/gp-prototype/internal/messages"
 	"github.com/streadway/amqp"
 	"go.uber.org/zap"
 )
@@ -67,15 +69,20 @@ func (r *RabbitClient) DeclareQueue(name string) error {
 	return nil
 }
 
-func (r *RabbitClient) PublishMessage(name string, message string) error {
-	err := r.Ch.Publish(
+func (r *RabbitClient) PublishMessage(name string, message messages.Message) error {
+	msg, err := json.Marshal(message)
+	if err != nil {
+		return err
+	}
+
+	err = r.Ch.Publish(
 		"",
 		name,
 		false,
 		false,
 		amqp.Publishing{
-			ContentType: "text/plain",
-			Body:        []byte(message),
+			ContentType: "application/json",
+			Body:        msg,
 		},
 	)
 	if err != nil {
